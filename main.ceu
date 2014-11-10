@@ -22,23 +22,41 @@ native do
 end
 native @nohold _SDL_text2texture();
 
+#include "controllers.ceu"
+
 class Sprite with
   var int x;
   var int y;
   var int width;
   var int height;
   var bool immovable = false;
+  var int velocity_x = 0;
+  var int velocity_y = 0;
+  var bool alive = true;
+  var int gravity_x = 0;
+  var int gravity_y = 0;
+  var bool exists = true;
+  event void go_physics;
 do
   var _SDL_Rect r;
-  r.x = this.x;
-  r.y = this.y;
   r.w = this.width;
   r.h = this.height;
 
-  every SDL_REDRAW do
-    _SDL_SetRenderDrawColor(_REN, 255, 255, 255, 255);
-    _SDL_RenderFillRect(_REN, &r);
-    _SDL_RenderDrawRect(_REN, &r);
+  par do
+    every this.go_physics do
+      this.velocity_x = this.velocity_x + this.gravity_x;
+      this.x = this.x + this.velocity_x / 100;
+      this.velocity_y = this.velocity_y + this.gravity_y;
+      this.y = this.y + this.velocity_y / 100;
+    end
+  with
+    every SDL_REDRAW do
+      r.x = this.x;
+      r.y = this.y;
+      _SDL_SetRenderDrawColor(_REN, 255, 255, 255, 255);
+      _SDL_RenderFillRect(_REN, &r);
+      _SDL_RenderDrawRect(_REN, &r);
+    end
   end
 end
 
@@ -94,8 +112,10 @@ with
 end
 
 #include "fnts.ceu"
-// #include "snds.ceu"
 
+var int bg_r = 0;
+var int bg_g = 0;
+var int bg_b = 0;
 
 par/or do
   await SDL_QUIT;
@@ -107,7 +127,7 @@ with
   r.w = w;
   r.h = h;
   every SDL_REDRAW do
-    _SDL_SetRenderDrawColor(_REN, 155, 89, 182, 255);
+    _SDL_SetRenderDrawColor(_REN, bg_r, bg_g, bg_b, 255);
     _SDL_RenderFillRect(_REN, &r);
   end
 with
@@ -115,6 +135,15 @@ with
   loop do
     // play
     do
+      // change the color of the background to purple
+      bg_r = 155;
+      bg_g = 89;
+      bg_b = 182;
+
+      var KeyController cursor with
+        this.k_action = _SDLK_SPACE;
+      end;
+
       var Sprite player with
         this.x = 80;
         this.y = h*2/3-20;
@@ -143,25 +172,85 @@ with
       end;
 
       var Text labelLevel with
-        this.x = w - 100 + 0.5;
+        this.x = w - 100;
         this.y = h - 35;
         _snprintf(this.content, 80, "1/%d", _MAPLENGTH);
       end;
-        
 
-      var bool touching_down = false;
-  
-      every SDL_DT do
-        touching_down = false;
-        if player.y >= line.y - line.height/2 - player.height/2 then
-          touching_down = true;
-          player.y = line.y - line.height/2 - player.height/2;
+      var Text labelTuto with
+        this.x = _floor(w / 2);
+        this.y = h - 35;
+        _snprintf(this.content, 80, "press space to jump");
+      end;
+
+      var int level = 0;
+      var int start = 0;
+
+      loop do
+        _printf("top of loop\n");
+        if level == _MAPLENGTH then
+          break;
+        else
+          // drawLevel
+          level = level + 1;
+          _snprintf(labelLevel.content, 80, "%d/%d", level, _MAPLENGTH);
+          do
+            player.gravity_y = 0;
+            player.x = 60;
+            player.y = h*2/3 - player.height / 2 - 30;
+            player.velocity_x = 0;
+            player.velocity_y = 0;
+            // player.angle = 0?
+            // if this.rotation then pause this.rotation?
+          end
+        end
+        if level == 2 then
+          _snprintf(labelTuto.content, 80, "");
+        end
+
+        var bool touching_down = false;
+        every SDL_DT do
+          touching_down = false;
+          if player.y >= line.y - line.height/2 - player.height/2 then
+            touching_down = true;
+            player.y = line.y - line.height/2 - player.height/2;
+            player.velocity_y = 0;
+          end
+          if cursor.action and touching_down then
+            _printf("start to jump\n");
+            do // playerJump
+              player.velocity_y = -250;
+              // add a tween?
+            end
+            if start == 0 then
+              start = 1;
+              player.velocity_x = 170;
+            end
+          end
+          if start == 1 and touching_down then
+            player.alive = true;
+            player.velocity_x = 170;
+          end
+          if player.x >= w - 60 then
+            break;
+          end
+          player.gravity_y = 12;
+          if player.y > line.y then
+            // initPlayer
+          end
+          // game.overlap(player, cubes, playerHit)
+          emit player.go_physics;
         end
       end
     end
-  
+
     // end
     do
+      // change the color of the background to purple
+      bg_r = 155;
+      bg_g = 89;
+      bg_b = 182;
+
       var Text label1 with
         this.x = w/2;
         this.y = h/2 - 20;
@@ -170,8 +259,9 @@ with
       var Text label2 with
         this.x = w/2;
         this.y = h/2 + 20;
-        _snprintf(this.content, 80, "and died %d times\ncan you do better?", deaths);
+        _snprintf(this.content, 80, "and died %d times", deaths);
       end;
+      await FOREVER;
     end
   end
 with
