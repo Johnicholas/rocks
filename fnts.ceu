@@ -25,14 +25,14 @@ _TTF_Init();
  * termination.
  */
 finalize
-    _FONT_BIG = _TTF_OpenFont("fnts/vera.ttf", _REN_H/20);
+    _FONT_BIG = _TTF_OpenFont("fnts/vera.ttf", h/20);
 with
     _TTF_CloseFont(_FONT_BIG);
 end
 _assert(_FONT_BIG != null);
 
 finalize
-    _FONT_SMALL = _TTF_OpenFont("fnts/vera.ttf", _REN_H/40);
+    _FONT_SMALL = _TTF_OpenFont("fnts/vera.ttf", h/40);
 with
     _TTF_CloseFont(_FONT_SMALL);
 end
