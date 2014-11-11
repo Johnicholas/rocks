@@ -11,8 +11,31 @@ native @nohold _snprintf();
 native do
   SDL_Renderer* REN = NULL;
 
-  // TODO: map
-  #define MAPLENGTH 10
+  #define LEVELS 20
+  #define LENGTH 22
+  int map[LEVELS][LENGTH] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 5, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 5, 5, 5, 0, 0, 0, 0, 2, 3, 0, 0, 0, 0, 0, 2, 3, 0, 0, 0, 0},
+    {0, 0, 0, 0, 2, 0, 0, 0, 5, 0, 0, 0, 0, 2, 0, 0, 0, 5, 0, 0, 0, 3},
+    {0, 0, 0, 0, 2, 3, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 0, 0},
+    {0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0},
+    {0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2},
+    {0, 0, 5, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 2},
+    {0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 5, 0, 0, 0, 2, 2, 2, 0, 0, 5},
+    {0, 0, 0, 0, 2, 3, 2, 0, 0, 0, 5, 5, 0, 0, 0, 2, 3, 2, 0, 0, 0, 0},
+    {0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 3, 0, 0, 0, 5, 0, 0, 0, 0, 2},
+    {0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0},
+    {0, 0, 0, 0, 4, 0, 0, 0, 0, 5, 0, 0, 0, 3, 3, 0, 0, 0, 0, 5, 0, 0},
+    {0, 0, 0, 0, 0, 5, 0, 0, 2, 2, 0, 0, 0, 0, 5, 5, 0, 0, 0, 4, 0, 0},
+    {0, 0, 0, 0, 1, 4, 1, 0, 0, 0, 0, 1, 4, 1, 0, 0, 0, 0, 0, 1, 4, 1},
+    {0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 2, 0, 0}
+  };
+
   SDL_Texture* SDL_text2texture(SDL_Renderer* ren, TTF_Font* font, char* text, SDL_Color* fg) {
     SDL_Surface* s = TTF_RenderText_Blended(font, text, *fg);
     SDL_Texture* t = SDL_CreateTextureFromSurface(ren, s);
@@ -22,7 +45,29 @@ native do
 end
 native @nohold _SDL_text2texture();
 
-#include "controllers.ceu"
+input _SDL_KeyboardEvent* SDL_KEYUP;
+input _SDL_KeyboardEvent* SDL_KEYDOWN;
+
+class KeyController with
+  var int k_action;
+  var bool action = false;
+do
+  par do
+    var _SDL_KeyboardEvent[] key;
+    every key in SDL_KEYDOWN do
+      if key:keysym.sym == this.k_action then
+        this.action = true;
+      end
+    end
+  with
+    var _SDL_KeyboardEvent[] key;
+    every key in SDL_KEYUP do
+      if key:keysym.sym == this.k_action then
+        this.action = false;
+      end
+    end
+  end 
+end
 
 class Sprite with
   var int x;
@@ -60,31 +105,32 @@ do
   end
 end
 
-class Group with
-  // nothing?
-do
-  // nothing?
-end
-
 class Text with
   var int x;
   var int y;
   var char[80] content;
   // style?
+  event void go_render;
 do
-  var _SDL_Texture[] tex;
-  finalize
-    tex = _SDL_text2texture(_REN, _FONT_BIG, this.content, &_colors.white);
-  with
-    _SDL_DestroyTexture(tex);
-  end
+  loop do
+    par/or do
+      await this.go_render;
+    with
+      var _SDL_Texture[] tex;
+      finalize
+        tex = _SDL_text2texture(_REN, _FONT_BIG, this.content, &_colors.white);
+      with
+        _SDL_DestroyTexture(tex);
+      end
 
-  var _SDL_Rect r;
-  r.x = this.x;
-  r.y = this.y;
-  _SDL_QueryTexture(tex, null, null, &r.w, &r.h);
-  every SDL_REDRAW do
-    _SDL_RenderCopy(_REN, tex, null, &r);
+      var _SDL_Rect r;
+      r.x = this.x;
+      r.y = this.y;
+      _SDL_QueryTexture(tex, null, null, &r.w, &r.h);
+      every SDL_REDRAW do
+        _SDL_RenderCopy(_REN, tex, null, &r);
+      end
+    end
   end
 end
 
@@ -131,138 +177,168 @@ with
     _SDL_RenderFillRect(_REN, &r);
   end
 with
-  // main trail
-  loop do
-    // play
-    do
-      // change the color of the background to purple
-      bg_r = 155;
-      bg_g = 89;
-      bg_b = 182;
+  do // play
+    // change the color of the background to purple
+    bg_r = 155;
+    bg_g = 89;
+    bg_b = 182;
 
-      var KeyController cursor with
-        this.k_action = _SDLK_SPACE;
-      end;
+    var KeyController cursor with
+      this.k_action = _SDLK_SPACE;
+    end;
 
-      var Sprite player with
-        this.x = 80;
-        this.y = h*2/3-20;
-        this.height = 10;
-        this.width = 10;
-      end;
+    var Sprite player with
+      this.x = 80;
+      this.y = h*2/3-20;
+      this.height = 10;
+      this.width = 10;
+    end;
   
-      var Group cubes with
-        // nothing?
-      end;
-  
-      var Sprite line with
-        this.x = 50;
-        this.y = _floor(h * 2 / 3);
-        this.width = w - 100;
-        this.height = 0;
-        this.immovable = true;
-      end;
+    var Sprite line with
+      this.x = 50;
+      this.y = _floor(h * 2 / 3);
+      this.width = w - 100;
+      this.height = 0;
+      this.immovable = true;
+    end;
 
-      deaths = 0;
+    deaths = 0;
 
-      var Text labelDeath with
-        this.x = 100;
-        this.y = h - 36;
-        _snprintf(this.content, 80, "%d", deaths);
-      end;
+    var Text labelDeath with
+      this.x = 100;
+      this.y = h - 36;
+      _snprintf(this.content, 80, "%d", deaths);
+    end;
 
-      var Text labelLevel with
-        this.x = w - 100;
-        this.y = h - 35;
-        _snprintf(this.content, 80, "1/%d", _MAPLENGTH);
-      end;
+    var Text labelLevel with
+      this.x = w - 100;
+      this.y = h - 35;
+      _snprintf(this.content, 80, "1/%d", _LEVELS);
+    end;
 
-      var Text labelTuto with
-        this.x = _floor(w / 2);
-        this.y = h - 35;
-        _snprintf(this.content, 80, "press space to jump");
-      end;
+    var Text labelTuto with
+      this.x = _floor(w / 2);
+      this.y = h - 35;
+      _snprintf(this.content, 80, "press space to jump");
+    end;
 
-      var int level = 0;
-      var int start = 0;
+    var int level = 0;
+    var int start = 0;
 
-      loop do
-        _printf("top of loop\n");
-        if level == _MAPLENGTH then
-          break;
-        else
-          // drawLevel
-          level = level + 1;
-          _snprintf(labelLevel.content, 80, "%d/%d", level, _MAPLENGTH);
-          do
-            player.gravity_y = 0;
-            player.x = 60;
-            player.y = h*2/3 - player.height / 2 - 30;
-            player.velocity_x = 0;
-            player.velocity_y = 0;
-            // player.angle = 0?
-            // if this.rotation then pause this.rotation?
-          end
-        end
-        if level == 2 then
-          _snprintf(labelTuto.content, 80, "");
-        end
-
-        var bool touching_down = false;
-        every SDL_DT do
-          touching_down = false;
-          if player.y >= line.y - line.height/2 - player.height/2 then
-            touching_down = true;
-            player.y = line.y - line.height/2 - player.height/2;
-            player.velocity_y = 0;
-          end
-          if cursor.action and touching_down then
-            _printf("start to jump\n");
-            do // playerJump
-              player.velocity_y = -250;
-              // add a tween?
+    loop do
+      pool Sprite[] cube_pool;
+      if level == _LEVELS then
+        break;
+      else
+        do // drawLevel
+          loop i in _LENGTH do
+            if _map[level][i] == 1 then
+              spawn Sprite in cube_pool with
+                this.x = 100 + i * 10;
+                this.y = h * 2 / 3 - 3;
+                this.width = 10;
+                this.height = 3;
+              end;
+            else/if _map[level][i] == 2 then
+              spawn Sprite in cube_pool with
+                this.x = 100 + i * 10;
+                this.y = h * 2 / 3 - 10;
+                this.width = 10;
+                this.height = 10;
+              end;
+            else/if _map[level][i] == 3 then
+              spawn Sprite in cube_pool with
+                this.x = 100 + i * 10;
+                this.y = h * 2 / 3 - 15;
+                this.width = 10;
+                this.height = 15;
+              end;
+            else/if _map[level][i] == 4 then
+              spawn Sprite in cube_pool with
+                this.x = 100 + i * 10;
+                this.y = h * 2 / 3 - 18;
+                this.width = 10;
+                this.height = 18;
+              end;
+            else/if _map[level][i] == 5 then
+              spawn Sprite in cube_pool with
+                this.x = 100 + i * 10;
+                this.y = h * 2 / 3 - 28;
+                this.width = 10;
+                this.height = 5;
+              end;
             end
-            if start == 0 then
-              start = 1;
-              player.velocity_x = 170;
-            end
-          end
-          if start == 1 and touching_down then
-            player.alive = true;
-            player.velocity_x = 170;
-          end
-          if player.x >= w - 60 then
-            break;
-          end
-          player.gravity_y = 12;
-          if player.y > line.y then
-            // initPlayer
-          end
-          // game.overlap(player, cubes, playerHit)
-          emit player.go_physics;
+          end;
+        end
+        level = level + 1;
+        _snprintf(labelLevel.content, 80, "%d/%d", level, _LEVELS);
+        emit labelLevel.go_render;
+        do
+          player.gravity_y = 0;
+          player.x = 60;
+          player.y = h*2/3 - player.height / 2 - 30;
+          player.velocity_x = 0;
+          player.velocity_y = 0;
+          // player.angle = 0?
+          // if this.rotation then pause this.rotation?
         end
       end
-    end
+      if level == 2 then
+        _snprintf(labelTuto.content, 80, "");
+        emit labelTuto.go_render;
+      end
 
-    // end
-    do
-      // change the color of the background to purple
-      bg_r = 155;
-      bg_g = 89;
-      bg_b = 182;
-
-      var Text label1 with
-        this.x = w/2;
-        this.y = h/2 - 20;
-        _snprintf(this.content, 80, "you finished the game! :-D");
-      end;
-      var Text label2 with
-        this.x = w/2;
-        this.y = h/2 + 20;
-        _snprintf(this.content, 80, "and died %d times", deaths);
-      end;
-      await FOREVER;
+      var bool touching_down = false;
+      every SDL_DT do
+        touching_down = false;
+        if player.y + player.height >= line.y then
+          touching_down = true;
+          player.y = line.y - player.height;
+          player.velocity_y = 0;
+        end
+        if cursor.action and touching_down then
+          do // playerJump
+            player.velocity_y = -250;
+            // maybe add a tween to rotate it?
+          end
+          if start == 0 then
+            start = 1;
+            player.velocity_x = 170;
+          end
+        end
+        if start == 1 and touching_down then
+          player.alive = true;
+          player.velocity_x = 170;
+        end
+        if player.x >= w - 60 then
+          break;
+        end
+        player.gravity_y = 12;
+        if player.y > line.y then
+          do // initPlayer
+            // TODO
+          end
+        end
+        do // game.overlap(player, cubes, playerHit)
+          // TODO
+        end
+        emit player.go_physics;
+      end
     end
+  end
+
+  do // end
+    var Text label1 with
+      this.x = w/2;
+      this.y = h/2 - 20;
+      _snprintf(this.content, 80, "you finished the game! :-D");
+    end;
+    var Text label2 with
+      this.x = w/2;
+      this.y = h/2 + 20;
+      _snprintf(this.content, 80, "and died %d times", deaths);
+    end;
+    await FOREVER;
   end
 with
   every SDL_REDRAW do
