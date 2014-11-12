@@ -75,24 +75,33 @@ class Sprite with
   var int width;
   var int height;
   var bool immovable = false;
-  var int velocity_x = 0;
-  var int velocity_y = 0;
+  var float velocity_x = 0;
+  var float velocity_y = 0;
   var bool alive = true;
-  var int gravity_x = 0;
-  var int gravity_y = 0;
+  var float gravity_x = 0;
+  var float gravity_y = 0;
   var bool exists = true;
-  event void go_physics;
 do
   var _SDL_Rect r;
   r.w = this.width;
   r.h = this.height;
 
   par do
-    every this.go_physics do
-      this.velocity_x = this.velocity_x + this.gravity_x;
-      this.x = this.x + this.velocity_x / 100;
-      this.velocity_y = this.velocity_y + this.gravity_y;
-      this.y = this.y + this.velocity_y / 100;
+    var float sx = 0;
+    var float sy = 0;
+    var int dt;
+    every dt in SDL_DT do
+      if _abs(sx - this.x) > 1 then
+        sx = this.x; // a hack so we can move a sprite by assigning
+      end
+      sx = sx + this.velocity_x * dt;
+      this.x = sx;
+      this.velocity_y = this.velocity_y + this.gravity_y * dt;
+      if _abs(sy - this.y) > 1 then
+        sy = this.y; // a hack so we can move a sprite by assigning
+      end
+      sy = sy + this.velocity_y * dt;
+      this.y = sy;
     end
   with
     every SDL_REDRAW do
@@ -203,6 +212,8 @@ with
     end;
 
     deaths = 0;
+    var int level = 0;
+    var int start = 0;
 
     var Text labelDeath with
       this.x = 100;
@@ -213,7 +224,7 @@ with
     var Text labelLevel with
       this.x = w - 100;
       this.y = h - 35;
-      _snprintf(this.content, 80, "1/%d", _LEVELS);
+      _snprintf(this.content, 80, "%d/%d", level, _LEVELS);
     end;
 
     var Text labelTuto with
@@ -222,46 +233,43 @@ with
       _snprintf(this.content, 80, "press space to jump");
     end;
 
-    var int level = 0;
-    var int start = 0;
-
     loop do
-      pool Sprite[] cube_pool;
+      pool Sprite[] cubes;
       if level == _LEVELS then
         break;
       else
         do // drawLevel
           loop i in _LENGTH do
             if _map[level][i] == 1 then
-              spawn Sprite in cube_pool with
+              spawn Sprite in cubes with
                 this.x = 100 + i * 10;
                 this.y = h * 2 / 3 - 3;
                 this.width = 10;
                 this.height = 3;
               end;
             else/if _map[level][i] == 2 then
-              spawn Sprite in cube_pool with
+              spawn Sprite in cubes with
                 this.x = 100 + i * 10;
                 this.y = h * 2 / 3 - 10;
                 this.width = 10;
                 this.height = 10;
               end;
             else/if _map[level][i] == 3 then
-              spawn Sprite in cube_pool with
+              spawn Sprite in cubes with
                 this.x = 100 + i * 10;
                 this.y = h * 2 / 3 - 15;
                 this.width = 10;
                 this.height = 15;
               end;
             else/if _map[level][i] == 4 then
-              spawn Sprite in cube_pool with
+              spawn Sprite in cubes with
                 this.x = 100 + i * 10;
                 this.y = h * 2 / 3 - 18;
                 this.width = 10;
                 this.height = 18;
               end;
             else/if _map[level][i] == 5 then
-              spawn Sprite in cube_pool with
+              spawn Sprite in cubes with
                 this.x = 100 + i * 10;
                 this.y = h * 2 / 3 - 28;
                 this.width = 10;
@@ -276,9 +284,9 @@ with
         do
           player.gravity_y = 0;
           player.x = 60;
-          player.y = h*2/3 - player.height / 2 - 30;
+          player.y = h*2/3 - 30;
           player.velocity_x = 0;
-          player.velocity_y = 0;
+          player.velocity_y = 0.1; // TODO: 0
           // player.angle = 0?
           // if this.rotation then pause this.rotation?
         end
@@ -298,31 +306,56 @@ with
         end
         if cursor.action and touching_down then
           do // playerJump
-            player.velocity_y = -250;
+            player.velocity_y = -0.25;
             // maybe add a tween to rotate it?
           end
           if start == 0 then
             start = 1;
-            player.velocity_x = 170;
+            player.velocity_x = 0.17;
           end
         end
         if start == 1 and touching_down then
           player.alive = true;
-          player.velocity_x = 170;
+          player.velocity_x = 0.17;
         end
         if player.x >= w - 60 then
           break;
         end
-        player.gravity_y = 12;
+        player.gravity_y = 0.0012;
         if player.y > line.y then
           do // initPlayer
-            // TODO
+            // TODO?
           end
         end
         do // game.overlap(player, cubes, playerHit)
-          // TODO
+          var _SDL_Rect r1;
+          r1.x = player.x;
+          r1.y = player.y;
+          r1.w = player.width;
+          r1.h = player.height;
+          loop (Sprite*)cube in cubes do
+            var _SDL_Rect r2;
+            r2.x = cube:x;
+            r2.y = cube:y;
+            r2.w = cube:width;
+            r2.h = cube:height;
+            if _SDL_HasIntersection(&r1, &r2) then
+              player.alive = false;
+              deaths = deaths + 1;
+              _snprintf(labelDeath.content, 80, "%d", deaths);
+              emit labelDeath.go_render;
+              do // initplayer
+                player.gravity_y = 0;
+                player.x = 60;
+                player.y = h * 2/3 - 30;
+                player.velocity_x = 0;
+                player.velocity_y = 0;
+                // set angle?
+                // pause rotation?
+              end
+            end
+          end
         end
-        emit player.go_physics;
       end
     end
   end
