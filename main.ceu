@@ -74,18 +74,10 @@ class Sprite with
   var int y;
   var int width;
   var int height;
-  var bool immovable = false;
   var float velocity_x = 0;
   var float velocity_y = 0;
-  var bool alive = true;
-  var float gravity_x = 0;
   var float gravity_y = 0;
-  var bool exists = true;
 do
-  var _SDL_Rect r;
-  r.w = this.width;
-  r.h = this.height;
-
   par do
     var float sx = 0;
     var float sy = 0;
@@ -104,9 +96,12 @@ do
       this.y = sy;
     end
   with
+    var _SDL_Rect r;
     every SDL_REDRAW do
       r.x = this.x;
       r.y = this.y;
+      r.w = this.width;
+      r.h = this.height;
       _SDL_SetRenderDrawColor(_REN, 255, 255, 255, 255);
       _SDL_RenderFillRect(_REN, &r);
       _SDL_RenderDrawRect(_REN, &r);
@@ -118,7 +113,6 @@ class Text with
   var int x;
   var int y;
   var char[80] content;
-  // style?
   event void go_render;
 do
   loop do
@@ -150,11 +144,6 @@ var int w = 600;
 var int h = 200;
 var int deaths = 0;
 
-native do
-  ##include <time.h>
-end
-_srand(_time(null));    // initialize the game "randomizer"
-
 var _SDL_Window* win;
 finalize
   win = _SDL_CreateWindow("Block Jump", _SDL_WINDOWPOS_CENTERED, _SDL_WINDOWPOS_CENTERED, w, h, _SDL_WINDOW_SHOWN);
@@ -170,9 +159,18 @@ end
 
 #include "fnts.ceu"
 
-var int bg_r = 0;
-var int bg_g = 0;
-var int bg_b = 0;
+function (Sprite* player) => void initPlayer
+do
+  player:gravity_y = 0;
+  player:x = 60;
+  player:y = h*2/3 - 30;
+  player:velocity_x = 0;
+  player:velocity_y = 0;
+end
+
+var int bg_r = 155;
+var int bg_g = 89;
+var int bg_b = 182;
 
 par/or do
   await SDL_QUIT;
@@ -189,11 +187,6 @@ with
   end
 with
   do // play
-    // change the color of the background to purple
-    bg_r = 155;
-    bg_g = 89;
-    bg_b = 182;
-
     var KeyController cursor with
       this.k_action = _SDLK_SPACE;
     end;
@@ -210,10 +203,8 @@ with
       this.y = _floor(h * 2 / 3);
       this.width = w - 100;
       this.height = 0;
-      this.immovable = true;
     end;
 
-    deaths = 0;
     var int level = 0;
     var int start = 0;
 
@@ -283,15 +274,7 @@ with
         level = level + 1;
         _snprintf(labelLevel.content, 80, "%d/%d", level, _LEVELS);
         emit labelLevel.go_render;
-        do // initplayer
-          player.gravity_y = 0;
-          player.x = 60;
-          player.y = h*2/3 - 30;
-          player.velocity_x = 0;
-          player.velocity_y = 0;
-          // player.angle = 0?
-          // if this.rotation then pause this.rotation?
-        end
+        initPlayer(player);
       end
       if level == 2 then
         _snprintf(labelTuto.content, 80, "");
@@ -317,18 +300,12 @@ with
           end
         end
         if start == 1 and touching_down then
-          player.alive = true;
           player.velocity_x = 0.17;
         end
         if player.x >= w - 60 then
           break;
         end
         player.gravity_y = 0.0012;
-        if player.y > line.y then
-          do // initPlayer
-            // TODO?
-          end
-        end
         do // game.overlap(player, cubes, playerHit)
           var _SDL_Rect r1;
           r1.x = player.x;
@@ -342,19 +319,10 @@ with
             r2.w = cube:width;
             r2.h = cube:height;
             if _SDL_HasIntersection(&r1, &r2) then
-              player.alive = false;
               deaths = deaths + 1;
               _snprintf(labelDeath.content, 80, "%d", deaths);
               emit labelDeath.go_render;
-              do // initplayer
-                player.gravity_y = 0;
-                player.x = 60;
-                player.y = h * 2/3 - 30;
-                player.velocity_x = 0;
-                player.velocity_y = 0;
-                // set angle?
-                // pause rotation?
-              end
+              initPlayer(player);
             end
           end
         end
