@@ -136,6 +136,8 @@ do
       r.x = this.x;
       r.y = this.y;
       _SDL_QueryTexture(tex, null, null, &r.w, &r.h);
+      r.x = r.x - r.w / 2;
+      r.y = r.y - r.h;
       every SDL_REDRAW do
         _SDL_RenderCopy(_REN, tex, null, &r);
       end
@@ -281,12 +283,12 @@ with
         level = level + 1;
         _snprintf(labelLevel.content, 80, "%d/%d", level, _LEVELS);
         emit labelLevel.go_render;
-        do
+        do // initplayer
           player.gravity_y = 0;
           player.x = 60;
           player.y = h*2/3 - 30;
           player.velocity_x = 0;
-          player.velocity_y = 0.1; // TODO: 0
+          player.velocity_y = 0;
           // player.angle = 0?
           // if this.rotation then pause this.rotation?
         end
